@@ -9,7 +9,7 @@
   </head>
   <body>
     <div id="unity-container" class="unity-desktop">
-      <canvas id="unity-canvas" width=1600 height=900 tabindex="-1"></canvas>
+      <canvas id="unity-canvas" width=1366 height=768 tabindex="-1"></canvas>
       <div id="unity-loading-bar">
         <div id="unity-logo"></div>
         <div id="unity-progress-bar-empty">
@@ -55,7 +55,7 @@
       var loaderUrl = buildUrl + "/df4b6b630ebecd2cc473d77496144b1f.loader.js";
       var config = {
         arguments: [],
-        dataUrl: buildUrl + "/0578bb030233c7e615d3de112ac06da0.data.unityweb",
+        dataUrl: buildUrl + "/d3cf74e8dd682d026a135636bfd70191.data.unityweb",
         frameworkUrl: buildUrl + "/a8af97584c84c505ef805994ad45aa07.framework.js.unityweb",
         codeUrl: buildUrl + "/bfa385437169cb36d9f2d87893d873bd.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
@@ -104,8 +104,8 @@
 
       } else {
         // Desktop style: Render the game canvas in a window that can be maximized to fullscreen:
-        canvas.style.width = "1600px";
-        canvas.style.height = "900px";
+        canvas.style.width = "1366px";
+        canvas.style.height = "768px";
       }
 
       document.querySelector("#unity-loading-bar").style.display = "block";
