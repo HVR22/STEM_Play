@@ -1,83 +1,166 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-<title>STEM_PLAY</title>
-<style>
-  html,body{margin:0;height:100%;background:#0b0b0b;}
-  #unity-container{
-    position:fixed;left:0;top:0;width:100vw;height:100vh;
-    padding:env(safe-area-inset-top) env(safe-area-inset-right)
-            env(safe-area-inset-bottom) env(safe-area-inset-left);
-  }
-  #unity-canvas{width:100%;height:100%;background:#231F20;}
-  #ui{
-    position:fixed;right:calc(8px + env(safe-area-inset-right));
-    top:calc(8px + env(safe-area-inset-top));
-    display:flex;gap:8px;z-index:10
-  }
-  .ui-btn{
-    border:none;border-radius:12px;padding:10px 14px;
-    font:600 14px system-ui, sans-serif;
-    background:#1118; backdrop-filter:blur(6px);
-    color:#fff; cursor:pointer
-  }
-  .ui-btn:active{ transform:scale(.98) }
-  @media (hover:none){ .ui-btn{ padding:12px 16px; font-size:16px; } }
-</style>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>STEM_PLAY</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0; height: 100%; background: #0b0b0b; color: #eaeaea;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    }
+
+    /* Contenedor general (centra todo) */
+    .page {
+      min-height: 100%;
+      display: grid;
+      place-items: center;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+
+    /* Tarjeta con el juego pequeño + controles */
+    .card {
+      background: #141414;
+      border-radius: 14px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+      padding: 16px;
+      width: fit-content;
+    }
+
+    /* Escenario 800×600 inicial */
+    .stage {
+      width: 800px;
+      height: 600px;
+      background: #000;
+      position: relative;
+      overflow: hidden;
+      border-radius: 8px;
+    }
+
+    /* El canvas de Unity se estira al 100% de la stage */
+    #unity-canvas {
+      width: 100% !important;
+      height: 100% !important;
+      display: block;
+      background: #000;
+    }
+
+    /* Footer con botón y progreso */
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+
+    .left, .right { display: flex; gap: 8px; align-items: center; }
+    .btn {
+      appearance: none; border: 0; padding: 10px 14px; border-radius: 10px;
+      background: #2a2a2a; color: #fff; cursor: pointer; font-weight: 600;
+    }
+    .btn:hover { background: #333; }
+    .note { opacity: .75; font-size: 13px; }
+
+    /* Barra de progreso simple */
+    .progress {
+      width: 160px; height: 8px; background: #2a2a2a; border-radius: 999px; overflow: hidden;
+    }
+    .progress > div {
+      height: 100%; width: 0%; background: #5ccf7a; transition: width .2s ease;
+    }
+
+    /* Modo “Pantalla completa” fallback (para navegadores sin Fullscreen API):
+       expandimos la stage a 100vw×100vh cuando el wrapper tiene esta clase */
+    .wrapper-fullscreen .card { width: 100vw; height: 100vh; padding: 0; border-radius: 0; }
+    .wrapper-fullscreen .stage { width: 100vw; height: calc(100vh - 52px); border-radius: 0; }
+    .wrapper-fullscreen .toolbar { padding: 8px 12px; background: #141414; margin: 0; }
+  </style>
+
+  <script>
+    // Para reducir carga en móviles (menos “borroso” pero más ligero)
+    const _DEVICE_PIXEL_RATIO = (Math.min(screen.width, screen.height) <= 812) ? 1 : window.devicePixelRatio || 1;
+  </script>
 </head>
 <body>
-  <div id="unity-container">
-    <canvas id="unity-canvas" tabindex="0"></canvas>
+  <div id="wrapper" class="page">
+    <div class="card">
+      <div class="stage">
+        <canvas id="unity-canvas" tabindex="0"></canvas>
+      </div>
+      <div class="toolbar">
+        <div class="left">
+          <button id="btn-full" class="btn" disabled>⤢ Pantalla completa</button>
+          <button id="btn-reload" class="btn" title="Recargar juego">↻ Recargar</button>
+        </div>
+        <div class="right">
+          <div class="progress" aria-label="Cargando">
+            <div id="prog"></div>
+          </div>
+          <span id="status" class="note">Cargando…</span>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <div id="ui">
-    <button id="fs" class="ui-btn" aria-label="Pantalla completa">⛶</button>
-  </div>
-
-  <script>
-    const canvas = document.getElementById("unity-canvas");
-    const config = {
-      dataUrl: "Build/456f38241f2146b6aa0ae404bb6e52cf.data.unityweb",
-      frameworkUrl: "Build/41b796130dc21c903d4a9252ae38db79.framework.js.unityweb",
-      codeUrl: "Build/eac2a875bc962a77196e3803eebc3eb1.wasm.unityweb",
-      streamingAssetsUrl: "StreamingAssets",
-      companyName: "StemPlay",
-      productName: "STEM_PLAY",
-      productVersion: "1.0",
-      // Reduce reescalado excesivo en móviles 4K/retina:
-      devicePixelRatio: 1,
-      matchWebGLToCanvasSize: true
-    };
-  </script>
+  <!-- Loader generado por Unity -->
   <script src="Build/be8d990f02a68e515e0c10fd39410677.loader.js"></script>
   <script>
-    let unityInstance = null;
-    createUnityInstance(canvas, config, (p)=>{}).then(u => { unityInstance = u; });
+    (function () {
+      const canvas   = document.getElementById('unity-canvas');
+      const statusEl = document.getElementById('status');
+      const progBar  = document.getElementById('prog');
+      const btnFull  = document.getElementById('btn-full');
+      const btnReload= document.getElementById('btn-reload');
+      const wrapper  = document.getElementById('wrapper');
 
-    const fsBtn = document.getElementById("fs");
-    const isFS = () => document.fullscreenElement || document.webkitFullscreenElement;
+      // Config generado por Unity, con un par de ajustes útiles
+      const config = {
+        dataUrl: "Build/456f38241f2146b6aa0ae404bb6e52cf.data.unityweb",
+        frameworkUrl: "Build/41b796130dc21c903d4a9252ae38db79.framework.js.unityweb",
+        codeUrl: "Build/eac2a875bc962a77196e3803eebc3eb1.wasm.unityweb",
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: "StemPlay",
+        productName: "STEM_PLAY",
+        productVersion: "1.0",
 
-    function enterFS(){
-      try{ screen.orientation?.lock?.('landscape'); }catch(e){}
-      if (unityInstance && unityInstance.SetFullscreen) {
-        // Unity maneja los casos de navegador (user gesture)
-        unityInstance.SetFullscreen(1);
-      } else {
-        (canvas.requestFullscreen?.bind(canvas) ||
-         canvas.webkitRequestFullscreen?.bind(canvas) || (()=>{}))();
-      }
-    }
-    function exitFS(){
-      (document.exitFullscreen || document.webkitExitFullscreen || (()=>Promise.resolve()))();
-    }
-    fsBtn.addEventListener("click", ()=>{ isFS() ? exitFS() : enterFS(); });
+        // Mantiene el canvas al tamaño CSS (nuestra stage 800×600 / 100%)
+        devicePixelRatio: _DEVICE_PIXEL_RATIO,
+      };
 
-    // iOS Safari < 16 no soporta Fullscreen API -> oculta botón
-    if (!('fullscreenEnabled' in document || 'webkitFullscreenEnabled' in document)) {
-      fsBtn.style.display = 'none';
-    }
+      // Crear instancia
+      createUnityInstance(canvas, config, (progress) => {
+        const pct = Math.round(progress * 100);
+        progBar.style.width = pct + '%';
+        statusEl.textContent = (pct < 100) ? ('Cargando… ' + pct + '%') : 'Iniciando…';
+      }).then((unityInstance) => {
+        statusEl.textContent = 'Listo';
+        btnFull.disabled = false;
+
+        btnFull.addEventListener('click', async () => {
+          // Intentamos el fullscreen “real” de Unity
+          try {
+            unityInstance.SetFullscreen(1);
+          } catch (e) {
+            // Fallback CSS si no hay Fullscreen API
+            wrapper.classList.toggle('wrapper-fullscreen');
+          }
+        });
+
+        btnReload.addEventListener('click', () => {
+          // Recarga suave: reiniciar la página es lo más sólido en WebGL
+          location.reload();
+        });
+
+      }).catch((message) => {
+        statusEl.textContent = 'Error';
+        console.error(message);
+        alert('No se pudo iniciar el juego:\n\n' + message);
+      });
+    })();
   </script>
 </body>
 </html>
