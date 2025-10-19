@@ -9,7 +9,7 @@
   </head>
   <body>
     <div id="unity-container" class="unity-desktop">
-      <canvas id="unity-canvas" width=1280 height=720 tabindex="-1"></canvas>
+      <canvas id="unity-canvas" width=640 height=480 tabindex="-1"></canvas>
       <div id="unity-loading-bar">
         <div id="unity-logo"></div>
         <div id="unity-progress-bar-empty">
@@ -52,12 +52,12 @@
       }
 
       var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/c8d413682bd04e5af294cdd751d94c51.loader.js";
+      var loaderUrl = buildUrl + "/8170f473a14f83de9bff3801b3581b46.loader.js";
       var config = {
         arguments: [],
-        dataUrl: buildUrl + "/bcdc8b76e0945c8848c625d234492282.data.unityweb",
+        dataUrl: buildUrl + "/619dcec1a0d79d4b78085134de51a92d.data.unityweb",
         frameworkUrl: buildUrl + "/a8af97584c84c505ef805994ad45aa07.framework.js.unityweb",
-        codeUrl: buildUrl + "/ea75e37d702ff44d1dc51ae746933ece.wasm.unityweb",
+        codeUrl: buildUrl + "/0d7202f267a20e62e99f97d7a5ce81b9.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "StemPlay",
         productName: "STEM_PLAY",
@@ -104,8 +104,8 @@
 
       } else {
         // Desktop style: Render the game canvas in a window that can be maximized to fullscreen:
-        canvas.style.width = "1280px";
-        canvas.style.height = "720px";
+        canvas.style.width = "640px";
+        canvas.style.height = "480px";
       }
 
       document.querySelector("#unity-loading-bar").style.display = "block";
