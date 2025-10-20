@@ -50,8 +50,11 @@
   </style>
   <script>
     // Clampa el DPR en móviles para rendimiento (1 en pantallas pequeñas)
-    const _IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    const _DPR = _IS_MOBILE ? 1 : (window.devicePixelRatio || 1);
+const _IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+// Opción A (balance): 1.5x en móvil, nativo en desktop
+const _DPR = _IS_MOBILE ? Math.min((window.devicePixelRatio || 1), 1.5) 
+                        : (window.devicePixelRatio || 1);
 
     // iOS Safari no soporta fullscreen de canvas
     const _IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
