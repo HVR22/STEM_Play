@@ -1,133 +1,176 @@
 <!DOCTYPE html>
-<html lang="en-us">
-  <head>
-    <meta charset="utf-8">
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Unity Web Player | STEM_PLAY</title>
-    <link rel="shortcut icon" href="TemplateData/favicon.ico">
-    <link rel="stylesheet" href="TemplateData/style.css">
-  </head>
-  <body>
-    <div id="unity-container" class="unity-desktop">
-      <canvas id="unity-canvas" width=320 height=240 tabindex="-1"></canvas>
-      <div id="unity-loading-bar">
-        <div id="unity-logo"></div>
-        <div id="unity-progress-bar-empty">
-          <div id="unity-progress-bar-full"></div>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+  <title>STEM_PLAY</title>
+  <style>
+    :root{
+      --pad: 16px;
+      --card-radius: 14px;
+      --toolbar-h: 54px;
+      --max-stage-w: 960px; /* límite en desktop */
+      --aspect: 16/9;       /* cambia si tu juego usa otro ratio */
+      --bg: #0b0b0b;
+      --panel: #141414;
+      --txt: #eaeaea;
+      --muted: #9aa0a6;
+    }
+    html, body { height: 100%; margin:0; background: var(--bg); color: var(--txt); font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    .page { min-height: 100%; display: grid; place-items: center; padding: var(--pad); box-sizing: border-box; }
+    .card {
+      background: var(--panel); border-radius: var(--card-radius);
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+      padding: var(--pad);
+      width: fit-content; max-width: 100%;
+    }
+    .stage {
+      position: relative; background: #000; overflow: hidden; border-radius: 8px;
+      width: 800px; height: 450px; /* tamaño inicial por si JS tarda (16:9) */
+    }
+    #unity-canvas { width: 100% !important; height: 100% !important; display:block; background:#000; }
+    .toolbar {
+      display:flex; gap:8px; align-items:center; justify-content:space-between;
+      margin-top: 12px; flex-wrap: wrap;
+    }
+    .left,.right { display:flex; gap:8px; align-items:center; }
+    .btn { appearance:none; border:0; padding:10px 14px; border-radius:10px; background:#2a2a2a; color:#fff; cursor:pointer; font-weight:600; }
+    .btn[disabled]{ opacity:.5; cursor:not-allowed; }
+    .btn:hover{ background:#333; }
+    .note { color: var(--muted); font-size:13px; }
+    .progress { width:160px; height:8px; background:#2a2a2a; border-radius:999px; overflow:hidden; }
+    .progress>div{ height:100%; width:0%; background:#5ccf7a; transition:width .2s ease; }
+
+    /* “Pantalla completa” de fallback (sin Fullscreen API): ocupa todo el viewport */
+    .wrapper-full .card { width: 100vw; height: 100vh; padding: 0; border-radius: 0; }
+    .wrapper-full .stage { width: 100vw; height: calc(100vh - var(--toolbar-h)); border-radius: 0; }
+    .wrapper-full .toolbar { padding: 8px 12px; margin: 0; background: var(--panel); }
+    .hidden{display:none !important;}
+  </style>
+  <script>
+    // Clampa el DPR en móviles para rendimiento (1 en pantallas pequeñas)
+    const _IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const _DPR = _IS_MOBILE ? 1 : (window.devicePixelRatio || 1);
+
+    // iOS Safari no soporta fullscreen de canvas
+    const _IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  </script>
+</head>
+<body>
+  <div id="wrapper" class="page">
+    <div class="card">
+      <div id="stage" class="stage">
+        <canvas id="unity-canvas" tabindex="0"></canvas>
+      </div>
+      <div class="toolbar" id="toolbar">
+        <div class="left">
+          <button id="btn-full" class="btn" disabled>⤢ Pantalla completa</button>
+          <button id="btn-reload" class="btn" title="Recargar juego">↻ Recargar</button>
+        </div>
+        <div class="right">
+          <div class="progress"><div id="prog"></div></div>
+          <span id="status" class="note">Cargando…</span>
         </div>
       </div>
-      <div id="unity-warning"> </div>
-      <div id="unity-footer">
-        <div id="unity-logo-title-footer"></div>
-        <div id="unity-fullscreen-button"></div>
-        <div id="unity-build-title">STEM_PLAY</div>
-      </div>
     </div>
-    <script>
-      var canvas = document.querySelector("#unity-canvas");
+  </div>
 
-      // Shows a temporary message banner/ribbon for a few seconds, or
-      // a permanent error message on top of the canvas if type=='error'.
-      // If type=='warning', a yellow highlight color is used.
-      // Modify or remove this function to customize the visually presented
-      // way that non-critical warnings and error messages are presented to the
-      // user.
-      function unityShowBanner(msg, type) {
-        var warningBanner = document.querySelector("#unity-warning");
-        function updateBannerVisibility() {
-          warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
-        }
-        var div = document.createElement('div');
-        div.innerHTML = msg;
-        warningBanner.appendChild(div);
-        if (type == 'error') div.style = 'background: red; padding: 10px;';
-        else {
-          if (type == 'warning') div.style = 'background: yellow; padding: 10px;';
-          setTimeout(function() {
-            warningBanner.removeChild(div);
-            updateBannerVisibility();
-          }, 5000);
-        }
-        updateBannerVisibility();
+  <script src="Build/c2222f5436d43c8ad93ce23f977be1bf.loader.js"></script>
+  <script>
+    (function () {
+      const canvas   = document.getElementById('unity-canvas');
+      const stageEl  = document.getElementById('stage');
+      const wrapper  = document.getElementById('wrapper');
+      const toolbar  = document.getElementById('toolbar');
+      const statusEl = document.getElementById('status');
+      const progBar  = document.getElementById('prog');
+      const btnFull  = document.getElementById('btn-full');
+      const btnReload= document.getElementById('btn-reload');
+
+      const ASPECT = 16/9; // ↔️ Cambia si tu juego usa otro ratio
+      const MAX_W  = 960;  // ancho máximo “cómodo” en desktop
+      const PADDING = 32;  // margen de seguridad (px)
+
+      // Calcula un size que SIEMPRE quepa en la ventana manteniendo el aspecto
+      function resizeStage() {
+        const vw = Math.max(document.documentElement.clientWidth,  window.innerWidth  || 0);
+        const vh = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
+
+        const freeH = vh - toolbar.offsetHeight - PADDING;
+        const freeW = Math.min(vw - PADDING, MAX_W);
+
+        // Limitante por alto y por ancho
+        const byW_w = freeW;
+        const byW_h = byW_w / ASPECT;
+        const byH_h = freeH;
+        const byH_w = byH_h * ASPECT;
+
+        let w, h;
+        // Elegimos la opción que quepa en ambas dimensiones
+        if (byW_h <= freeH) { w = byW_w; h = byW_h; }
+        else                { w = byH_w; h = byH_h; }
+
+        // Evitar números locos
+        w = Math.max(320, Math.floor(w));
+        h = Math.max(180, Math.floor(h));
+
+        stageEl.style.width  = w + 'px';
+        stageEl.style.height = h + 'px';
+
+        // Si Unity ya está corriendo y matchWebGLToCanvasSize=true, ajusta solo
+        // (si tuvieras problemas, puedes forzar: canvas.width=w; canvas.height=h;)
       }
 
-      var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/8170f473a14f83de9bff3801b3581b46.loader.js";
-      var config = {
-        arguments: [],
-        dataUrl: buildUrl + "/8e28e5e07f38b266d8ddc07e45348523.data.unityweb",
-        frameworkUrl: buildUrl + "/a8af97584c84c505ef805994ad45aa07.framework.js.unityweb",
-        codeUrl: buildUrl + "/0d7202f267a20e62e99f97d7a5ce81b9.wasm.unityweb",
+      // Config generado por Unity + opciones útiles
+      const config = {
+        dataUrl: "Build/6db88f1d157226a950a2f865a795a6ff.data.unityweb",
+        frameworkUrl: "Build/41b796130dc21c903d4a9252ae38db79.framework.js.unityweb",
+        codeUrl: "Build/4212b9f5bcfe79b9adbcc85279b9f226.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "StemPlay",
         productName: "STEM_PLAY",
         productVersion: "1.0",
-        showBanner: unityShowBanner,
-        // errorHandler: function(err, url, line) {
-        //    alert("error " + err + " occurred at line " + line);
-        //    // Return 'true' if you handled this error and don't want Unity
-        //    // to process it further, 'false' otherwise.
-        //    return true;
-        // },
+
+        devicePixelRatio: _DPR,
+        matchWebGLToCanvasSize: true // <- CLAVE para responsive real
       };
 
-      // By default, Unity keeps WebGL canvas render target size matched with
-      // the DOM size of the canvas element (scaled by window.devicePixelRatio)
-      // Set this to false if you want to decouple this synchronization from
-      // happening inside the engine, and you would instead like to size up
-      // the canvas DOM size and WebGL render target sizes yourself.
-      // config.matchWebGLToCanvasSize = false;
+      // Arrancamos pequeño y reacomodamos al vuelo
+      resizeStage();
+      window.addEventListener('resize',   resizeStage);
+      window.addEventListener('orientationchange', resizeStage);
 
-      // If you would like all file writes inside Unity Application.persistentDataPath
-      // directory to automatically persist so that the contents are remembered when
-      // the user revisits the site the next time, uncomment the following line:
-      // config.autoSyncPersistentDataPath = true;
-      // This autosyncing is currently not the default behavior to avoid regressing
-      // existing user projects that might rely on the earlier manual
-      // JS_FileSystem_Sync() behavior, but in future Unity version, this will be
-      // expected to change.
+      createUnityInstance(canvas, config, (progress) => {
+        const pct = Math.round(progress * 100);
+        progBar.style.width = pct + '%';
+        statusEl.textContent = (pct < 100) ? ('Cargando… ' + pct + '%') : 'Iniciando…';
+      }).then((unityInstance) => {
+        statusEl.textContent = 'Listo';
+        btnFull.disabled = false;
 
-      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-        // Mobile device style: fill the whole browser client area with the game canvas:
+        btnFull.addEventListener('click', () => {
+          if (_IOS) {
+            // Fallback en iOS: expandimos a viewport (no fullscreen real)
+            wrapper.classList.toggle('wrapper-full');
+            resizeStage();
+          } else {
+            // Fullscreen real donde está permitido
+            try { unityInstance.SetFullscreen(1); } catch (e) {
+              wrapper.classList.toggle('wrapper-full');
+              resizeStage();
+            }
+          }
+        });
 
-        var meta = document.createElement('meta');
-        meta.name = 'viewport';
-        meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
-        document.getElementsByTagName('head')[0].appendChild(meta);
-        document.querySelector("#unity-container").className = "unity-mobile";
-        canvas.className = "unity-mobile";
+        btnReload.addEventListener('click', () => location.reload());
 
-        // To lower canvas resolution on mobile devices to gain some
-        // performance, uncomment the following line:
-        // config.devicePixelRatio = 1;
-
-
-      } else {
-        // Desktop style: Render the game canvas in a window that can be maximized to fullscreen:
-        canvas.style.width = "320px";
-        canvas.style.height = "240px";
-      }
-
-      document.querySelector("#unity-loading-bar").style.display = "block";
-
-      var script = document.createElement("script");
-      script.src = loaderUrl;
-      script.onload = () => {
-        createUnityInstance(canvas, config, (progress) => {
-          document.querySelector("#unity-progress-bar-full").style.width = 100 * progress + "%";
-              }).then((unityInstance) => {
-                document.querySelector("#unity-loading-bar").style.display = "none";
-                document.querySelector("#unity-fullscreen-button").onclick = () => {
-                  unityInstance.SetFullscreen(1);
-                };
-
-              }).catch((message) => {
-                alert(message);
-              });
-            };
-
-      document.body.appendChild(script);
-
-    </script>
-  </body>
+      }).catch((message) => {
+        statusEl.textContent = 'Error';
+        console.error(message);
+        alert('No se pudo iniciar el juego:\n\n' + message);
+      });
+    })();
+  </script>
+</body>
 </html>
