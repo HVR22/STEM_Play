@@ -53,7 +53,7 @@
 const _IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
 // Opción A (balance): 1.5x en móvil, nativo en desktop
-const _DPR = _IS_MOBILE ? Math.min((window.devicePixelRatio || 1), 1.5) 
+const _DPR = _IS_MOBILE ? Math.min((window.devicePixelRatio || 1), 2) 
                         : (window.devicePixelRatio || 1);
 
     // iOS Safari no soporta fullscreen de canvas
