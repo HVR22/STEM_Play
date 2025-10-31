@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+  <title>STEM_PLAY</title>
+  <style>
+    :root{
+      --pad: 16px;
+      --card-radius: 14px;
+      --toolbar-h: 54px;
+      --max-stage-w: 960px; /* límite en desktop */
+      --aspect: 16/9;       /* cambia si tu juego usa otro ratio */
+      --bg: #0b0b0b;
+      --panel: #141414;
+      --txt: #eaeaea;
+      --muted: #9aa0a6;
+    }
+    html, body { height: 100%; margin:0; background: var(--bg); color: var(--txt); font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    .page { min-height: 100%; display: grid; place-items: center; padding: var(--pad); box-sizing: border-box; }
+    .card {
+      background: var(--panel); border-radius: var(--card-radius);
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+      padding: var(--pad);
+      width: fit-content; max-width: 100%;
+    }
+    .stage {
+      position: relative; background: #000; overflow: hidden; border-radius: 8px;
+      width: 800px; height: 450px; /* tamaño inicial por si JS tarda (16:9) */
+    }
+    #unity-canvas { width: 100% !important; height: 100% !important; display:block; background:#000; }
+    .toolbar {
+      display:flex; gap:8px; align-items:center; justify-content:space-between;
+      margin-top: 12px; flex-wrap: wrap;
+    }
+    .left,.right { display:flex; gap:8px; align-items:center; }
+    .btn { appearance:none; border:0; padding:10px 14px; border-radius:10px; background:#2a2a2a; color:#fff; cursor:pointer; font-weight:600; }
+    .btn[disabled]{ opacity:.5; cursor:not-allowed; }
+    .btn:hover{ background:#333; }
+    .note { color: var(--muted); font-size:13px; }
+    .progress { width:160px; height:8px; background:#2a2a2a; border-radius:999px; overflow:hidden; }
+    .progress>div{ height:100%; width:0%; background:#5ccf7a; transition:width .2s ease; }
+
+    /* “Pantalla completa” de fallback (sin Fullscreen API): ocupa todo el viewport */
+    .wrapper-full .card { width: 100vw; height: 100vh; padding: 0; border-radius: 0; }
+    .wrapper-full .stage { width: 100vw; height: calc(100vh - var(--toolbar-h)); border-radius: 0; }
+    .wrapper-full .toolbar { padding: 8px 12px; margin: 0; background: var(--panel); }
+    .hidden{display:none !important;}
+  </style>
+  <script>
+    // Clampa el DPR en móviles para rendimiento (1 en pantallas pequeñas)
+const _IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+// Opción A (balance): 1.5x en móvil, nativo en desktop
+const _DPR = _IS_MOBILE ? Math.min((window.devicePixelRatio || 1), 2) 
+                        : (window.devicePixelRatio || 1);
+
+    // iOS Safari no soporta fullscreen de canvas
+    const _IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  </script>
+</head>
+<body>
+  <div id="wrapper" class="page">
+    <div class="card">
+      <div id="stage" class="stage">
+        <canvas id="unity-canvas" tabindex="0"></canvas>
+      </div>
+      <div class="toolbar" id="toolbar">
+        <div class="left">
+          <button id="btn-full" class="btn" disabled>⤢ Pantalla completa</button>
+          <button id="btn-reload" class="btn" title="Recargar juego">↻ Recargar</button>
+        </div>
+        <div class="right">
+          <div class="progress"><div id="prog"></div></div>
+          <span id="status" class="note">Cargando…</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="Build/eab041af682b92a7c365babaf0d2f17c.loader.js"></script>
+  <script>
+    (function () {
+      const canvas   = document.getElementById('unity-canvas');
+      const stageEl  = document.getElementById('stage');
+      const wrapper  = document.getElementById('wrapper');
+      const toolbar  = document.getElementById('toolbar');
+      const statusEl = document.getElementById('status');
+      const progBar  = document.getElementById('prog');
+      const btnFull  = document.getElementById('btn-full');
+      const btnReload= document.getElementById('btn-reload');
+
+      const ASPECT = 16/9; // ↔️ Cambia si tu juego usa otro ratio
+      const MAX_W  = 960;  // ancho máximo “cómodo” en desktop
+      const PADDING = 32;  // margen de seguridad (px)
+
+      // Calcula un size que SIEMPRE quepa en la ventana manteniendo el aspecto
+      function resizeStage() {
+        const vw = Math.max(document.documentElement.clientWidth,  window.innerWidth  || 0);
+        const vh = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
+
+        const freeH = vh - toolbar.offsetHeight - PADDING;
+        const freeW = Math.min(vw - PADDING, MAX_W);
+
+        // Limitante por alto y por ancho
+        const byW_w = freeW;
+        const byW_h = byW_w / ASPECT;
+        const byH_h = freeH;
+        const byH_w = byH_h * ASPECT;
+
+        let w, h;
+        // Elegimos la opción que quepa en ambas dimensiones
+        if (byW_h <= freeH) { w = byW_w; h = byW_h; }
+        else                { w = byH_w; h = byH_h; }
+
+        // Evitar números locos
+        w = Math.max(320, Math.floor(w));
+        h = Math.max(180, Math.floor(h));
+
+        stageEl.style.width  = w + 'px';
+        stageEl.style.height = h + 'px';
+
+        // Si Unity ya está corriendo y matchWebGLToCanvasSize=true, ajusta solo
+        // (si tuvieras problemas, puedes forzar: canvas.width=w; canvas.height=h;)
+      }
+
+      // Config generado por Unity + opciones útiles
+      const config = {
+        dataUrl: "Build/4c99471dabcdbee1f1545312d055e14b.data.unityweb",
+        frameworkUrl: "Build/41b796130dc21c903d4a9252ae38db79.framework.js.unityweb",
+        codeUrl: "Build/68bcca18cea108fcf90223d625263e46.wasm.unityweb",
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: "StemPlay",
+        productName: "STEM_PLAY",
+        productVersion: "1.0",
+
+        devicePixelRatio: _DPR,
+        matchWebGLToCanvasSize: true // <- CLAVE para responsive real
+      };
+
+      // Arrancamos pequeño y reacomodamos al vuelo
+      resizeStage();
+      window.addEventListener('resize',   resizeStage);
+      window.addEventListener('orientationchange', resizeStage);
+
+      createUnityInstance(canvas, config, (progress) => {
+        const pct = Math.round(progress * 100);
+        progBar.style.width = pct + '%';
+        statusEl.textContent = (pct < 100) ? ('Cargando… ' + pct + '%') : 'Iniciando…';
+      }).then((unityInstance) => {
+        statusEl.textContent = 'Listo';
+        btnFull.disabled = false;
+
+        btnFull.addEventListener('click', () => {
+          if (_IOS) {
+            // Fallback en iOS: expandimos a viewport (no fullscreen real)
+            wrapper.classList.toggle('wrapper-full');
+            resizeStage();
+          } else {
+            // Fullscreen real donde está permitido
+            try { unityInstance.SetFullscreen(1); } catch (e) {
+              wrapper.classList.toggle('wrapper-full');
+              resizeStage();
+            }
+          }
+        });
+
+        btnReload.addEventListener('click', () => location.reload());
+
+      }).catch((message) => {
+        statusEl.textContent = 'Error';
+        console.error(message);
+        alert('No se pudo iniciar el juego:\n\n' + message);
+      });
+    })();
+  </script>
+</body>
+</html>
